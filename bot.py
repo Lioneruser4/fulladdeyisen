@@ -36,7 +36,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = query.data
     if data == 'yes':
-        # Kullanıcı verilerinden bilgileri al
         user_info = user_data.get(user_id, {})
         file_id = user_info.get('file_id')
         title = user_info.get('title', 'Bilinmeyen Şarkı')
@@ -46,7 +45,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
             
         # Kanal için caption oluştur
-        caption = f"{title}\n\n𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪ (https://t.me/{CHANNEL_USERNAME})"
+        caption = f"🎵 {title}\n\n[𝐁𝐓 𝐌𝐔𝐒𝐈𝐐𝐈 ♪](https://t.me/{CHANNEL_USERNAME})"
         
         try:
             # Kanalda paylaş
@@ -54,26 +53,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=f"@{CHANNEL_USERNAME}",
                 audio=file_id,
                 title=title[:64],
-                performer="𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪",
+                performer="𝐁𝐓 𝐌𝐔𝐒𝐈𝐐𝐈 ♪",
                 caption=caption,
-                parse_mode='HTML'
+                parse_mode='MarkdownV2'
             )
             
             await query.edit_message_text("✅ Müzik kanalda paylaşıldı!")
-            
-            # Kullanıcıya geri gönder
-            await context.bot.send_audio(
-                chat_id=user_id,
-                audio=file_id,
-                caption=caption,
-                parse_mode='HTML'
-            )
             
         except Exception as e:
             logger.error(f"Kanal gönderim hatası: {e}")
             await query.edit_message_text("❌ Kanalda paylaşılırken bir hata oluştu.")
     else:
-        await query.edit_message_text("❌ İşlem iptal edildi.")
+        await query.edit_message_text("❌ Kanalda paylaşım iptal edildi.")
     
     # Kullanıcı verilerini temizle
     if user_id in user_data:
@@ -89,9 +80,6 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     try:
-        # Kullanıcıya işlem başladı bilgisi ver
-        processing_msg = await update.message.reply_text("🎵 Müzik işleniyor, lütfen bekleyin...")
-        
         # Müzik dosyasını al
         audio_file = await update.message.audio.get_file()
         title = Path(update.message.audio.file_name).stem  # Uzantıyı kaldır
@@ -102,18 +90,28 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'title': title
         }
         
+        # Müziği kullanıcıya geri gönder
+        caption = f"🎵 {title}\n\n[𝐁𝐓 𝐌𝐔𝐒𝐈𝐐𝐈 ♪](https://t.me/{CHANNEL_USERNAME})"
+        await context.bot.send_audio(
+            chat_id=chat_id,
+            audio=audio_file.file_id,
+            caption=caption,
+            parse_mode='MarkdownV2'
+        )
+        
         # Onay butonları oluştur
         keyboard = [
-            [InlineKeyboardButton("✅ Evet, Paylaş", callback_data='yes')],
+            [InlineKeyboardButton("✅ Kanalda Paylaş", callback_data='yes')],
             [InlineKeyboardButton("❌ İptal", callback_data='no')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Onay iste
-        await processing_msg.edit_text(
-            f"Bu müziği kanalda paylaşmak istiyor musunuz?\n\n"
-            f"Başlık: {title}\n"
-            f"Kanal: @{CHANNEL_USERNAME}",
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"Bu müziği kanalda paylaşmak istiyor musunuz?\n\n"
+                 f"Başlık: {title}\n"
+                 f"Kanal: @{CHANNEL_USERNAME}",
             reply_markup=reply_markup
         )
         
