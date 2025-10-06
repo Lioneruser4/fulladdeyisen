@@ -1,7 +1,7 @@
 import os
 import logging
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from pathlib import Path
 
 # Loglama ayarları
@@ -11,16 +11,81 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Bot token'ı
+# Bot token'ı ve ayarlar
 TOKEN = '2138035413:AAGYaGtgvQ4thyJKW2TXLS5n3wyZ6vVx3I8'
-CHANNEL_USERNAME = 'btmusiqi'  # @ işareti olmadan yazın
+CHANNEL_USERNAME = 'btmusiqi'  # @ işareti olmadan
+AUTHORIZED_USERS = [976640409]  # Yetkili kullanıcı ID'leri
+
+# Kullanıcı verilerini saklamak için geçici depo
+user_data = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in AUTHORIZED_USERS:
+        await update.message.reply_text("❌ Bu botu kullanma yetkiniz yok.")
+        return
     await update.message.reply_text('Azərbaycan musiqisi göndər')
+
+async def confirm_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if user_id not in AUTHORIZED_USERS:
+        await query.edit_message_text("❌ Bu işlemi yapma yetkiniz yok.")
+        return
+    
+    data = query.data.split('_')
+    action = data[1]
+    file_id = data[2]
+    
+    if action == 'yes':
+        # Kanalda paylaş
+        try:
+            # Kullanıcı verilerinden bilgileri al
+            user_info = user_data.get(user_id, {})
+            title = user_info.get('title', 'Bilinmeyen Şarkı')
+            
+            # Kanal için caption oluştur
+            caption = f"{title}\n\n𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪ (https://t.me/{CHANNEL_USERNAME})"
+            
+            # Kanalda paylaş
+            await context.bot.send_audio(
+                chat_id=f"@{CHANNEL_USERNAME}",
+                audio=file_id,
+                title=title[:64],
+                performer="𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪",
+                caption=caption,
+                parse_mode='HTML'
+            )
+            
+            await query.edit_message_text("✅ Müzik kanalda paylaşıldı!")
+            
+            # Kullanıcıya geri gönder
+            await context.bot.send_audio(
+                chat_id=user_id,
+                audio=file_id,
+                caption=caption,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Kanal gönderim hatası: {e}")
+            await query.edit_message_text("❌ Kanalda paylaşılırken bir hata oluştu.")
+    else:
+        await query.edit_message_text("❌ İşlem iptal edildi.")
+    
+    # Kullanıcı verilerini temizle
+    if user_id in user_data:
+        del user_data[user_id]
 
 async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
+    
+    # Yetki kontrolü
+    if user.id not in AUTHORIZED_USERS:
+        await update.message.reply_text("❌ Bu botu kullanma yetkiniz yok.")
+        return
     
     try:
         # Kullanıcıya işlem başladı bilgisi ver
@@ -28,43 +93,34 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Müzik dosyasını al
         audio_file = await update.message.audio.get_file()
+        title = Path(update.message.audio.file_name).stem  # Uzantıyı kaldır
         
-        # Başlık ve sanatçı bilgisini çıkar
-        if ' - ' in update.message.audio.file_name:
-            artist, title = update.message.audio.file_name.rsplit(' - ', 1)
-            title = Path(title).stem  # Uzantıyı kaldır
-        else:
-            title = Path(update.message.audio.file_name).stem
-            artist = "Bilinmiyor"
+        # Kullanıcı verilerini kaydet
+        user_data[user.id] = {
+            'file_id': audio_file.file_id,
+            'title': title
+        }
         
-        # Kanalda paylaş
-        try:
-            # Önce kanala gönder
-            channel_message = await context.bot.send_audio(
-                chat_id=f"@{CHANNEL_USERNAME}",
-                audio=audio_file.file_id,
-                title=title[:64],
-                performer=artist[:64],
-                caption=f"🎵 {title}\n👤 {artist}\n\n🔊 @{CHANNEL_USERNAME}"
-            )
-            
-            # Kullanıcıya geri gönder
-            await context.bot.send_audio(
-                chat_id=chat_id,
-                audio=channel_message.audio.file_id,
-                caption=f"🎵 {title}\n👤 {artist}\n\n🔊 @{CHANNEL_USERNAME}"
-            )
-            
-            # İşlem tamamlandı mesajını güncelle
-            await processing_msg.edit_text("✅ Müzik başarıyla paylaşıldı!")
-            
-        except Exception as e:
-            logger.error(f"Kanal gönderim hatası: {e}")
-            await update.message.reply_text("Müzik kanala gönderilirken bir hata oluştu. Lütfen tekrar deneyin.")
-            
+        # Onay butonları oluştur
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Evet, Paylaş", callback_data=f'confirm_yes_{audio_file.file_id}'),
+                InlineKeyboardButton("❌ İptal", callback_data='confirm_no_0')
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Onay iste
+        await processing_msg.edit_text(
+            f"Bu müziği kanalda paylaşmak istiyor musunuz?\n\n"
+            f"Başlık: {title}\n\n"
+            f"Kanal: @{CHANNEL_USERNAME}",
+            reply_markup=reply_markup
+        )
+        
     except Exception as e:
         logger.error(f"Genel hata: {e}")
-        await update.message.reply_text("Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.")
+        await update.message.reply_text("❌ Bir hata oluştu. Lütfen tekrar deneyin.")
 
 def main():
     # Uygulamayı oluştur
@@ -73,6 +129,7 @@ def main():
     # Komut işleyicileri
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.AUDIO, handle_audio))
+    application.add_handler(CallbackQueryHandler(confirm_send, pattern="^confirm_"))
     
     # Botu başlat
     application.run_polling()
