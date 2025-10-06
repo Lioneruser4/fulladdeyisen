@@ -45,7 +45,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
             
         # Kanal için caption oluştur
-        caption = f"🎵 {title}\n\n[𝐁𝐓 𝐌𝐔𝐒𝐈𝐐𝐈 ♪](https://t.me/{CHANNEL_USERNAME})"
+        caption = f"🎵 {title}\n[𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪](https://t.me/{CHANNEL_USERNAME})"
         
         try:
             # Kanalda paylaş
