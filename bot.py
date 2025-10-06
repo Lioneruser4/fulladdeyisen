@@ -25,7 +25,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text('Azərbaycan musiqisi göndər')
 
-async def confirm_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
@@ -34,20 +34,21 @@ async def confirm_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Bu işlemi yapma yetkiniz yok.")
         return
     
-    data = query.data.split('_')
-    action = data[1]
-    file_id = data[2]
-    
-    if action == 'yes':
-        # Kanalda paylaş
+    data = query.data
+    if data == 'yes':
+        # Kullanıcı verilerinden bilgileri al
+        user_info = user_data.get(user_id, {})
+        file_id = user_info.get('file_id')
+        title = user_info.get('title', 'Bilinmeyen Şarkı')
+        
+        if not file_id:
+            await query.edit_message_text("❌ Dosya bulunamadı. Lütfen tekrar deneyin.")
+            return
+            
+        # Kanal için caption oluştur
+        caption = f"{title}\n\n𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪ (https://t.me/{CHANNEL_USERNAME})"
+        
         try:
-            # Kullanıcı verilerinden bilgileri al
-            user_info = user_data.get(user_id, {})
-            title = user_info.get('title', 'Bilinmeyen Şarkı')
-            
-            # Kanal için caption oluştur
-            caption = f"{title}\n\n𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪ (https://t.me/{CHANNEL_USERNAME})"
-            
             # Kanalda paylaş
             await context.bot.send_audio(
                 chat_id=f"@{CHANNEL_USERNAME}",
@@ -103,17 +104,15 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Onay butonları oluştur
         keyboard = [
-            [
-                InlineKeyboardButton("✅ Evet, Paylaş", callback_data=f'confirm_yes_{audio_file.file_id}'),
-                InlineKeyboardButton("❌ İptal", callback_data='confirm_no_0')
-            ]
+            [InlineKeyboardButton("✅ Evet, Paylaş", callback_data='yes')],
+            [InlineKeyboardButton("❌ İptal", callback_data='no')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Onay iste
         await processing_msg.edit_text(
             f"Bu müziği kanalda paylaşmak istiyor musunuz?\n\n"
-            f"Başlık: {title}\n\n"
+            f"Başlık: {title}\n"
             f"Kanal: @{CHANNEL_USERNAME}",
             reply_markup=reply_markup
         )
@@ -129,7 +128,7 @@ def main():
     # Komut işleyicileri
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.AUDIO, handle_audio))
-    application.add_handler(CallbackQueryHandler(confirm_send, pattern="^confirm_"))
+    application.add_handler(CallbackQueryHandler(button_callback))
     
     # Botu başlat
     application.run_polling()
