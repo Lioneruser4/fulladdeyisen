@@ -1,4 +1,29 @@
-# ... (previous imports and setup remain the same)
+import os
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+from pathlib import Path
+
+# Loglama ayarları
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Bot token'ı ve ayarlar
+TOKEN = '2138035413:AAGYaGtgvQ4thyJKW2TXLS5n3wyZ6vVx3I8'
+CHANNEL_USERNAME = 'btmusiqi'  # @ işareti olmadan
+AUTHORIZED_USERS = [976640409]  # Yetkili kullanıcı ID'leri
+
+# Kullanıcı verilerini saklamak için geçici depo
+user_data = {}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in AUTHORIZED_USERS:
+        await update.message.reply_text("❌ Bu botu kullanma yetkiniz yok.")
+        return
+    await update.message.reply_text('Azərbaycan musiqisi göndər')
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -92,21 +117,21 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
             audio=audio_file.file_id,
             title=formatted_title[:64],
             performer="𝐁𝐓 𝐌𝐮𝐬𝐢𝐪𝐢 ♪",
-            caption=f"🎵 {formatted_title}\n\nKanal: @{CHANNEL_USERNAME}",
+            caption=f"🎵 {formatted_title}\n\nKanalımıza katıl: @{CHANNEL_USERNAME}",
             reply_markup=reply_markup
         )
         
         # Onay butonları oluştur
         keyboard = [
             [InlineKeyboardButton("✅ Kanalda Paylaş", callback_data='yes')],
-            [InlineKeyboardButton("❌ Paylaşma", callback_data='no')]
+            [InlineKeyboardButton("❌ İptal", callback_data='no')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Onay iste
         await context.bot.send_message(
             chat_id=chat_id,
-            text=f"kanalda paylaşmak?\n\n"
+            text=f"Bu müziği kanalda paylaşmak istiyor musunuz?\n\n"
                  f"Başlık: {formatted_title}\n"
                  f"Kanal: @{CHANNEL_USERNAME}",
             reply_markup=reply_markup
@@ -116,4 +141,17 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Genel hata: {e}")
         await update.message.reply_text("❌ Bir hata oluştu. Lütfen tekrar deneyin.")
 
-# ... (main fonksiyonu ve diğer kodlar aynı kalacak)
+def main():
+    # Uygulamayı oluştur
+    application = Application.builder().token(TOKEN).build()
+    
+    # Komut işleyicileri
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.AUDIO, handle_audio))
+    application.add_handler(CallbackQueryHandler(button_callback))
+    
+    # Botu başlat
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
