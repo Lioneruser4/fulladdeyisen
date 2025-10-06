@@ -4,7 +4,6 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TPE1, TIT2, TALB, COMM
-from dotenv import load_dotenv
 
 # Loglama ayarları
 logging.basicConfig(
@@ -13,9 +12,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# .env dosyasından token'ı yükle
-load_dotenv()
-TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+# Bot token'ı doğrudan koda ekleniyor
+TOKEN = '2138035413:AAGYaGtgvQ4thyJKW2TXLS5n3wyZ6vVx3I8'
 CHANNEL_USERNAME = 'btmusiqi'  # Kanal kullanıcı adı
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,9 +50,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Değişiklikleri kaydet
         audio.save()
         
-        # Buton kullanılmayacak, sadece caption olacak
-        
-        # Düzenlenmiş dosyayı gönder (butonsuz)
+        # Düzenlenmiş dosyayı gönder
         with open(file_path, 'rb') as audio_file:
             await update.message.reply_audio(
                 audio=audio_file,
